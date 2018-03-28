@@ -10,7 +10,8 @@
       </Spin>
     </div>
     <div v-else class="container">
-      <p :class="infoClass" style="line-height:100px">{{showinfo}}</p>
+      <p :class="infoClass" style="line-height:80px">{{showinfo}}</p>
+      <p style="line-height:20px;color:#888">{{frozen}}</p>
     </div>
   </div>
 </template>
@@ -29,6 +30,13 @@ export default {
         return '￥ ' + this.data.balance;
       }else{
         return this.data.error;
+      }
+    },
+    frozen(){
+      if(this.data.error === ''){
+        return '冻结金额 ' + this.data.frozen + ' 至 '+this.data.frozenuntil;
+      }else{
+        return '';
       }
     },
     infoClass(){

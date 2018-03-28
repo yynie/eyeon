@@ -11,6 +11,7 @@ import VueResource from 'vue-resource'
 import VueClipboard from 'vue-clipboard2'
 import balanceModal from './components/BalanceModal.vue'
 import PrefixEditor from './components/prefixEditor.vue'
+import QRcodeModal from './components/QRcodeModal.vue'
 
 Vue.config.productionTip = false
 Vue.use(iView);
@@ -18,6 +19,7 @@ Vue.use(VueResource);
 Vue.use(VueClipboard);
 Vue.component('balance_modal',balanceModal);
 Vue.component('prefix-editor',PrefixEditor);
+Vue.component('qrcode_modal', QRcodeModal);
 
 /* eslint-disable no-new */
 new Vue({

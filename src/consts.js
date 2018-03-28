@@ -1,4 +1,5 @@
-global.TITEL_PREFIX='Eye On WHAT!'
+global.TITEL_PREFIX='Eye On WHAT!';
+global.CHARGE_CODE_URL="https://github.com/yynie/some/raw/master/QR.jpg";
 
 /* cookie */
 global.COOKIE_EXPIRED = 1;

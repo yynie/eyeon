@@ -1,3 +1,5 @@
+import { duration } from "_moment@2.21.0@moment";
+
 let util = {
 
 };
@@ -30,3 +32,9 @@ util.removeFromArray = function (arr,val) {
         arr.splice(index, 1);
     }
 };
+util.isExpired = function (start,now,duration){
+  if(now > start){
+    return ((start + duration) <= now);
+  }
+  return true; //时间错乱直接返号过期
+}

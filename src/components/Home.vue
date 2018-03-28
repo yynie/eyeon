@@ -11,7 +11,8 @@
             </a>
             <DropdownMenu slot="list">
                 <DropdownItem disabled><span style="color:#2d8cf0">{{vcpdisp}}</span></DropdownItem>
-                <DropdownItem name="balance"><b>￥账户余额</b></DropdownItem>
+                <DropdownItem :disabled="account.boundkey === null" name="balance"><b>￥账户余额</b></DropdownItem>
+                <DropdownItem :disabled="account.accname === null" name="charge"><b>￥充值</b></DropdownItem>
                 <DropdownItem name="exit"><b>注销<Icon type="log-out" style="marginLeft:6px"/></b></DropdownItem>
             </DropdownMenu>
           </Dropdown>
@@ -50,7 +51,7 @@
             <p style="marginTop:10px">单价：{{curSub.price}}</p>
             <Row style="height:40px">
               <p style="float:left;line-height:40px">授权：{{(curSub.onoff===1)?'已授权':'未授权'}}</p>
-              <Button :disabled="disPubButton" style="float:right;height:36px" type='primary' @click="pubTask">
+              <Button :disabled="disPubButton" :loading="publishing" style="float:right;height:36px" type='primary' @click="pubTask">
               发布
               </Button>
             </Row>
@@ -187,14 +188,28 @@ export default {
       provinceList:['北京','天津','河北','山西','内蒙古','辽宁','吉林','黑龙江','上海','江苏','浙江','安徽','福建','江西','山东','河南','湖北',
       '湖南','广东','广西','海南','重庆','四川','贵州','云南','西藏','陕西','甘肃','青海','宁夏','新疆','台湾','香港','澳门'],
       operatorList:['移动','联通'],
+
+/**
+ * 4只workerbees记录运行中的任务数据，各项含义：
+ * index 工蜂代号，state 状态，reqid requestid，startMillis 每个超时的起始计时点，numexp 取号超时，verexp 码超时，phone 终端号码，minfo 归属地运营商，data 终端回传的数据
+ * 状态迁移: 初始 'off' 没开工 => 发布任务成功 变成 'on' => 拿到号码 变成 'wait' 等数据 => 收到一条数据 变成 'run' 继续等数据 => verexp超时 变成 'off'
+ *                                                                                 =>  numexp 变成 'off'
+ * 例外： 用户手动关掉一只工蜂 state直接变成 'off'
+ * 断线重连：断线 所有工蜂先存入sessionStorage，然后重置。重连成功后 back in game
+ * 刷新网页：和断线类似，区别在于要用户手动点ws连接，重连成功后一样可以 back in game，但是如果点慢了可能血条不满
+ * 关闭网页：game over
+ */
       workers:[
-        {index:0,state:'off',numexp:0,verexp:0,data:null},
-        {index:1,state:'off',numexp:0,verexp:0,data:null},
-        {index:2,state:'off',numexp:0,verexp:0,data:null},
-        {index:3,state:'off',numexp:0,verexp:0,data:null}
+        {index:0,state:'off',reqid:null,startMillis:0,numexp:0,verexp:0,phone:null,minfo:null,data:null},
+        {index:1,state:'off',reqid:null,startMillis:0,numexp:0,verexp:0,phone:null,minfo:null,data:null},
+        {index:2,state:'off',reqid:null,startMillis:0,numexp:0,verexp:0,phone:null,minfo:null,data:null},
+        {index:3,state:'off',reqid:null,startMillis:0,numexp:0,verexp:0,phone:null,minfo:null,data:null}
       ],
-      workersNum:0,
-      workersQueue:[]
+      workersQueue:[],
+      workerStatus:{
+        pubreq:null,
+        workersNum:0,
+      }
     }
   },
   computed:{
@@ -263,19 +278,26 @@ export default {
         return false;
       }
     },
+    publishing(){
+      if(this.workerStatus.pubreq !== null){//正在发布还没返回结果
+        return true;
+      }else{
+        return false;
+      }
+    },
     disPubButton(){
-      if(this.account.boundkey === null || this.connectstatus !== 3){
+      if(this.account.boundkey === null || this.connectstatus !== 3){//没有绑key 没建立ws
         return true;
-      }else if(this.curSub.onoff===0){
+      }else if(this.curSub.onoff===0){//项目没开
         return true;
-      }else if(this.workersNum >= 4){
+      }else if(this.workerStatus.workersNum >= 4){//工蜂已用完
         return true;
       }else{
         return false;
       }
     },
     pubNum(){
-      return 4-this.workersNum;
+      return 4-this.workerStatus.workersNum;
     },
     numberCopy(){
       return '0000';
@@ -288,6 +310,8 @@ export default {
       }else if(menu === 'balance'){
         this.loadBalance();
         this.showBalanceModal();
+      }else if(menu === 'charge'){
+        this.showQRCode();
       }
     },
     handleSignOut:function(){
@@ -383,6 +407,20 @@ export default {
               }
           })
         },
+        okText:"关闭"
+      });
+    },
+    showQRCode:function(){
+      this.$Modal.info({
+        render: (h) => {
+          return h('qrcode_modal', {
+              props: {
+                url: CHARGE_CODE_URL,
+                accname:this.account.accname
+              }
+          })
+        },
+        okText:"关闭"
       });
     },
     deletePrefixs:function(index){
@@ -465,6 +503,11 @@ export default {
     wsClose:function(e){
       console.log(e);
       this.websocket = null;
+      sessionStorage.workers=JSON.stringify(this.workers);
+      for(var i=0; i<4; i++){
+        this.workerClose(i);
+      }
+      this.workerStatus.workersNum = 0;
       if(this.wsid !== null && this.connectstatus === 3){
         console.log("retry ws");
         this.connectstatus = 1; 
@@ -477,13 +520,18 @@ export default {
       var data = JSON.parse(e.data);
       console.log(JSON.stringify(data));
       if(data.state === '200000'){
-        if('wsid' in data.result){
+        if(('result' in data) && ('wsid' in data.result)){
           this.wsid = data.result.wsid;
           this.connectstatus = 3;
           sessionStorage.wsid = this.wsid;
+          //this.loadOldWorkers();
           this.$Message.success('任务频道建立成功！');
-        }else{
-          this.responseArrive(data);
+        }else if('requestid' in data){
+          if('result' in data){
+             this.wsRecv(data.requestid,data.result);
+          }else{
+            this.wsRecv(data.requestid,null);
+          }
         }
       }else{
         if(this.connectstatus === 1){
@@ -491,8 +539,141 @@ export default {
           this.websocket.close();
           this.connectstatus = 2;
         }else{
-          this.responseArrive(data);
+          this.wsRecvError(data.state, data.statemsg);
         }
+      }
+    },
+    wsSend:function(msg){
+      //console.log("wsSend:"+msg);
+      this.websocket.send(msg);
+    },
+    wsRecv:function(requestid,result){
+      if(result === null){
+        if(this.workerStatus.pubreq !== null && requestid === this.workerStatus.pubreq.requestid){
+          //发任务成功
+          var myDate = new Date();
+          var millis = myDate.getTime();
+          for(var i=0; i<this.workerStatus.pubreq.reqcount; i++){
+            for(var j=0;j<4;j++){
+              if(this.workers[j].state === 'off'){
+                this.workers[j].reqid = requestid;
+                this.workers[j].startMillis = millis;
+                this.workers[j].numexp = this.workerStatus.pubreq.numexp;
+                this.workers[j].verexp = this.workerStatus.pubreq.verifyexp;
+                this.workers[j].state = 'on';
+                this.workerStatus.workersNum++;
+                break;
+              }
+            }
+          }
+          this.workerStatus.pubreq = null;
+          //console.log("wsRecv:"+JSON.stringify(this.workers));
+        }
+        return;
+      }
+      
+      var parseddata = this.parseResult(result);
+      if(parseddata === null || parseddata.type === 'unknown'){
+          console.log("wsRecv:invalid result"+JSON.stringify(result));
+          return;
+      }
+
+      if(parseddata.type === 'phone'){//返号
+        var myDate = new Date();
+        var millis = myDate.getTime();
+        for(var i=0;i<4;i++){
+          if(this.workers[i].state === 'on'){
+            this.workers[j].startMillis = millis;
+            this.workers[j].phone = parseddata.phonenum;
+            this.workers[j].minfo = parseddata.minfo;
+            this.workers[i].data=[parseddata.data];
+            this.workers[j].state = 'wait';
+            break;
+          }
+        }
+        //console.log("wsRecv:"+JSON.stringify(this.workers));
+        return;
+      }
+
+      if(parseddata.type === 'data'){//code
+        var myDate = new Date();
+        var millis = myDate.getTime();
+        for(var i=0;i<4;i++){
+          if(this.workers[j].phone === parseddata.phonenum){
+            if(this.workers[i].state === 'wait'){
+              this.workers[i].data.push(parseddata.data);
+              this.workers[j].startMillis = millis;
+              this.workers[i].state === 'run';
+              break;
+            }
+            if(this.workers[i].state === 'run'){
+              this.workers[i].data.push(parseddata.data);
+              break;
+            }
+          }
+        }
+        //console.log("wsRecv:"+JSON.stringify(this.workers));
+        return;
+      }
+    },
+    parseResult:function(result){
+      if(('phonenum' in result) === false){
+        return null;
+      }
+      var ret = {
+        phonenum:result.phonenum,
+        type:'unknown'
+      }
+      var timestr = moment().format('HH:mm:ss') + ' '+ moment().millisecond();
+      
+      if('minfo' in result){
+        ret.type = 'phone';
+        ret['minfo'] = result.minfo;
+        ret.minfo['gettime'] = timestr;
+        var d = {
+          vicon:'trophy',
+          phrase:null,
+          info:result.phonenum + " 已接",
+          time:timestr
+        }
+        ret['data']=d;
+      }else if(('verifycode' in result) || ('verifysms' in result) || ('sendsms' in result)){
+        ret.type = 'data';
+        var d = {
+          vicon:'ios-circle-outline',
+          phrase:null,
+          info:null,
+          time:timestr
+        };
+        
+        if('verifycode' in result){
+          d.phrase = result.verifycode;
+          d.vicon = 'trophy'
+        }
+        if('verifysms' in result){
+          d.info = "收到："+result.verifysms;
+        }
+        if('sendsms' in result){
+          if(d.info.length>0){
+            d.info+="\n";
+          }
+          d.info += "发送："+result.sendsms;
+          if('sendto' in result){
+            d.info+="\n到 "+result.sendto;
+          }
+          if('sendok' in result){
+            d.info+=result.sendok===true?'\n成功':'\n失败';
+          }
+        }
+        
+        ret['data']=d;
+      }
+      return ret;
+    },
+    wsRecvError:function(state, statemsg){
+      if(this.workerStatus.pubreq !== null){//发布任务的返回是错误，弹个message然后作废
+        this.$Message.error({duration:5,content:statemsg});
+        this.workerStatus.pubreq = null;
       }
     },
     pubTask:function(){
@@ -503,7 +684,7 @@ export default {
       var timestring = this.account.accname+moment().format("YYYYMMDDHHmmss");
       var reqid=timestring.MD5(32);
 
-      var req = {
+      this.workerStatus.pubreq = {
         requestid:reqid,
         subid:this.curSub.subid,
         reqcount:this.task.count,
@@ -511,44 +692,84 @@ export default {
         verifyexp:this.task.verifyexp,
       }
       if(this.task.operator !== ''){
-        req['corp']=this.task.operator;
+        this.workerStatus.pubreq['corp']=this.task.operator;
       }
       if(this.task.province !== ''){
-        req['province']=this.task.province;
+        this.workerStatus.pubreq['province']=this.task.province;
       }
       if(this.task.prefixs.length > 0){
-        req['prefixs']=this.task.prefixs;
+        this.workerStatus.pubreq['prefixs']=this.task.prefixs;
       }
       if(this.task.exprefixs.length > 0){
-        req['exprefixs']=this.task.exprefixs;
+        this.workerStatus.pubreq['exprefixs']=this.task.exprefixs;
       }
-      //console.log("req="+JSON.stringify(req))
-      //this.workersQueue.splice(0,this.workersQueue.length);
-      for(var i=0; i<req.reqcount; i++){
+      for(var i=0; i<this.workerStatus.pubreq.reqcount; i++){
         var ok = false;
         for(var j=0;j<4;j++){
           if(this.workers[j].state === 'off'){
-            this.workers[j].state = 'on';
-            this.workersNum++;
             ok = true;
             break;
           }
         }
         if(ok === false){
-          console.error("pubTask i="+i+", failed!");
+          alert("FATAL ERROR:pubTask i="+i+", failed cause no empty slot now!");
+          console.error("pubTask i="+i+",failed::reqcount="+this.workerStatus.pubreq.reqcount+",workersNum="+this.workerStatus.workersNum);
+          return;
         }
       }
-      console.log("pubTask:"+JSON.stringify(this.workers));
-      //this.websocket.send(JOSN.stringify(req));
-      //this.task.count=1;
+      this.wsSend(JSON.stringify(this.workerStatus.pubreq));
     },
     workerClose:function(index){
-      if(this.workers[index].state === 'on'){
+      if(this.workers[index].state !== 'off'){
         this.workers[index].state = 'off';
+        this.workers[index].reqid = null;
+        this.workers[index].startMillis = 0;
+        this.workers[index].numexp = 0;
+        this.workers[index].verexp = 0;
+        this.workers[index].phone = null;
+        this.workers[index].minfo = null;
         this.workers[index].data = null;
-        this.workersNum--;
+        this.workerStatus.workersNum--;
       }
-      console.log("workerClose:"+JSON.stringify(this.workers));
+     // console.log("workerClose:"+JSON.stringify(this.workers));
+    },
+    loadOldWorkers:function(){
+      var myDate = new Date();
+      var millis = myDate.getTime();
+      var old = sessionStorage.workers;
+     // console.log("loadOldWorkers:"+old);
+      if(old !== null && old !== undefined && old.trim().length > 0){
+        var oldworkers = JSON.parse(old);
+        for(var i=0;i<4;i++){
+          var o = oldworkers[i];
+          if(o.state === 'on'){
+            if(Util.isExpired(o.startMillis,millis,o.numexp*1000)){
+              continue;
+            }
+          }
+          if(o.state === 'wait' || o.state === 'run'){
+            if(Util.isExpired(o.startMillis,millis,o.numexp*1000)){
+              continue;
+            }
+          }
+          //back in game
+          this.workers[i].reqid = o.reqid;
+          this.workers[i].startMillis = o.startMillis;
+          this.workers[i].numexp = o.numexp;
+          this.workers[i].verexp = o.verexp;
+          if('phone' in o){
+            this.workers[i].phone = o.phone;
+          }
+          if('minfo' in o){
+            this.workers[i].minfo = o.minfo;
+          }
+          if('data' in o){
+            this.workers[i].data = o.data;
+          }
+          this.workers[i].state = o.state;
+        }
+      }
+      //console.log("loadOldWorkers:workers="+JSON.stringify(this.workers));
     },
     onbeforeunload:function(){
       console.log("onbeforeunload");
@@ -562,9 +783,12 @@ export default {
     var get = Cookies.get('8EEFF760CE134927BFD3CCDAC2ADFF32');
     var user = JSON.parse(get);
     this.account.user = user.user;
-    console.log("mounted"+JSON.stringify(this.account));
+   // console.log("mounted"+JSON.stringify(this.account));
     this.loadVcpData();
     window.onbeforeunload = this.onbeforeunload;
+    this.$Message.config({
+      top: 200,
+    });
   },
   destroyed(){
     console.log("destroyed");
