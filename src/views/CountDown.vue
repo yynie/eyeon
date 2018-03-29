@@ -119,7 +119,7 @@ export default {
       this.run();
     },
     value(newVal, oldVal){
-      console.log("countdown"+newVal);
+      console.log("countdown "+newVal);
       if(newVal){
         this.run();
       }else{
@@ -130,6 +130,7 @@ export default {
   methods:{
     run:function(){
       if(this.timer === null){
+        console.log("run this.count="+this.count);
         if (this.value === true && this.count>0) {
           this.timer = window.setInterval(() => {
             this.count --;

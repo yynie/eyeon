@@ -8,7 +8,13 @@
           <!--
           <span :class="workerTitleClass">{{workerPrefix}}</span>
           -->
-          <span :class="workerTitleClass"><b @click="doCopy">{{workerNumber}}</b></span>
+          <Tooltip placement="top" :disabled="value.phone === null">
+            <span :class="workerTitleClass"><b @click="doCopy">{{workerNumber}}</b></span>
+              <div slot="content">
+                <p style="font-size:6pt;color:#fff;">点击复制号码到剪贴板</p>
+              </div>
+          </Tooltip>
+          
           <span style="color:#888;font-size:8pt;marginLeft:8px">{{workerInfo}}</span>
         </div>
         <div v-show="value.state !== 'off'" class="result-title-rdiv"  @click="close">
@@ -19,11 +25,13 @@
         <Timeline>
           <TimelineItem color="green" v-for="(item,index) in value.data" :key="index">
               <Icon :type="item.vicon" slot="dot"></Icon>
-              <p style="color:#19be6b;font-size:8pt">{{item.time}}</p>
-              <p v-show="item.phrase !== null && item.phrase.trim()>=4" style="color:#888;font-size:10pt">验证码：
+              <p style="color:#19be6b;font-size:10pt">{{item.time}}</p>
+              <!--
+              <p v-show="item.phrase !== null && item.phrase.trim().length>=4" style="color:#888;font-size:10pt">验证码：
                 <b style="color:#ff6600" @click="doCopy">{{item.phrase}}</b>
               </p>
-              <div class="multilinediv" v-html="formateInfo(item.info)"></div>
+              -->
+              <div class="multilinediv" v-html="formateInfo(item.phrase,item.info)"></div>
           </TimelineItem>
       </Timeline>
       </div>
@@ -54,7 +62,7 @@ export default {
   },
   data(){
     return {
-      exp:this.value.numexp,
+      exp:0
     }
   },
   computed:{
@@ -117,11 +125,15 @@ export default {
     },
     currentdata(){
       return this.value.data;
-    }
+    },
   },
   methods:{
-    formateInfo:function(info){
-      return info.replace("\n", "<br>")
+    formateInfo:function(phrase ,info){
+      var ret = info.replace(/\n/g, "<br>");
+      if(phrase !== null && phrase.trim().length > 0){
+        ret = ret.replace(phrase, "<b style=\"color:#ff6600\">"+ phrase + "</b>");
+      }
+      return ret;
     },
     doCopy:function(event){
       var el = event.currentTarget;
@@ -142,6 +154,27 @@ export default {
     },
     timeOut:function(){
       console.error("timeOut:"+this.exp);
+    },
+    adjustExp:function(){
+      var ret = 0;
+      if(this.value.state === 'on'){
+        ret = this.value.numexp;
+      }else if(this.value.state === 'wait' || this.value.state === 'run'){
+        ret = this.value.verexp;
+      }else{
+        return ret;
+      }
+      var myDate = new Date();
+      var millis = myDate.getTime();
+      console.log("adjustExp current:"+millis)
+      console.log("adjustExp startMillis:"+this.value.startMillis)
+      var del = Math.round((millis - this.value.startMillis)/1000);
+      console.log("adjustExp del:"+del)
+      if(del > 0){
+        ret -= (del - 1);
+      }
+      
+      return ret;
     }
   },
   watch:{
@@ -149,13 +182,18 @@ export default {
       console.log("worker current state watch:"+oldValue+"=>"+newValue);
       if(newValue === 'wait'){
         this.exp = 0;
-        this.exp = this.value.verexp;
+        this.exp = this.adjustExp();
+      }else if(newValue === 'on'){
+        this.exp = 0;
+        this.exp = this.adjustExp();
       }
     },
     currentdata:{
       handler(newValue, oldValue){
-        console.log("worker current data watch:"+JSON.stringify(newValue));
+        //console.log("worker current data watch:"+JSON.stringify(newValue));
+        this.$nextTick(() => {
         this.$refs.resdiv.scrollTop = this.$refs.resdiv.scrollHeight;
+        })
       },
       deep:true
     }
@@ -212,6 +250,7 @@ export default {
   // word-break:break-all;
   // word-wrap:break-word;
   font-size:10pt;
+  margin-top:4px;
 }
 </style>
 

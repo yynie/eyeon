@@ -11,7 +11,7 @@
     </div>
     <div v-else class="container">
       <p :class="infoClass" style="line-height:80px">{{showinfo}}</p>
-      <p style="line-height:20px;color:#888">{{frozen}}</p>
+      <p style="font-size:10pt;line-height:20px;color:#888">{{frozen}}</p>
     </div>
   </div>
 </template>
@@ -34,7 +34,7 @@ export default {
     },
     frozen(){
       if(this.data.error === ''){
-        return '冻结金额 ' + this.data.frozen + ' 至 '+this.data.frozenuntil;
+        return '冻结金额 ' + this.data.frozen + ' ,冻结时间 '+Math.round(this.data.frozensecs/60) + " 分钟";
       }else{
         return '';
       }

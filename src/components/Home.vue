@@ -168,7 +168,7 @@ export default {
   data () {
     return {
       account:{user:null,boundkey:null,accname:null,accdisp:null},
-      balance:{loading:false,error:'',balance:0},
+      balance:{loading:false,error:'',balance:0,frozen:0,frozensecs:0},
       loading:false,
       selectedSubid:'',
       subjects:[],
@@ -387,6 +387,10 @@ export default {
         if(response.body.state === "200000"){
           var result = response.body.result;
           this.balance.balance = result.accbalance;
+          this.balance.frozen = result.frozen;
+          if('frozensecs' in result){
+            this.balance.frozensecs = result.frozensecs;
+          }
           this.balance.error = '';
         }else{
           this.balance.error = response.body.statemsg;
@@ -518,13 +522,13 @@ export default {
     },
     wsMessage:function(e){
       var data = JSON.parse(e.data);
-      console.log(JSON.stringify(data));
+      //console.log(JSON.stringify(data));
       if(data.state === '200000'){
         if(('result' in data) && ('wsid' in data.result)){
           this.wsid = data.result.wsid;
           this.connectstatus = 3;
           sessionStorage.wsid = this.wsid;
-          //this.loadOldWorkers();
+          this.loadOldWorkers();
           this.$Message.success('任务频道建立成功！');
         }else if('requestid' in data){
           if('result' in data){
@@ -567,7 +571,7 @@ export default {
             }
           }
           this.workerStatus.pubreq = null;
-          //console.log("wsRecv:"+JSON.stringify(this.workers));
+         // console.log("wsRecv:"+JSON.stringify(this.workers));
         }
         return;
       }
@@ -577,17 +581,18 @@ export default {
           console.log("wsRecv:invalid result"+JSON.stringify(result));
           return;
       }
-
+      console.log("wsRecv:parseddata type "+parseddata.type);
       if(parseddata.type === 'phone'){//返号
         var myDate = new Date();
         var millis = myDate.getTime();
+        console.log("startMillis:"+millis)
         for(var i=0;i<4;i++){
-          if(this.workers[i].state === 'on'){
-            this.workers[j].startMillis = millis;
-            this.workers[j].phone = parseddata.phonenum;
-            this.workers[j].minfo = parseddata.minfo;
+          if(this.workers[i].reqid === requestid && this.workers[i].state === 'on'){
+            this.workers[i].startMillis = millis;
+            this.workers[i].phone = parseddata.phonenum;
+            this.workers[i].minfo = parseddata.minfo;
             this.workers[i].data=[parseddata.data];
-            this.workers[j].state = 'wait';
+            this.workers[i].state = 'wait';
             break;
           }
         }
@@ -599,10 +604,9 @@ export default {
         var myDate = new Date();
         var millis = myDate.getTime();
         for(var i=0;i<4;i++){
-          if(this.workers[j].phone === parseddata.phonenum){
+          if(this.workers[i].reqid === requestid && this.workers[i].phone === parseddata.phonenum){
             if(this.workers[i].state === 'wait'){
               this.workers[i].data.push(parseddata.data);
-              this.workers[j].startMillis = millis;
               this.workers[i].state === 'run';
               break;
             }
@@ -648,21 +652,23 @@ export default {
         
         if('verifycode' in result){
           d.phrase = result.verifycode;
-          d.vicon = 'trophy'
+          //d.vicon = 'trophy'
         }
         if('verifysms' in result){
           d.info = "收到："+result.verifysms;
         }
         if('sendsms' in result){
-          if(d.info.length>0){
-            d.info+="\n";
+          if(d.info === null){
+            d.info = "发送："+result.sendsms;
+          }else{
+            d.info += "\n发送："+result.sendsms;
           }
-          d.info += "发送："+result.sendsms;
+          
           if('sendto' in result){
             d.info+="\n到 "+result.sendto;
           }
           if('sendok' in result){
-            d.info+=result.sendok===true?'\n成功':'\n失败';
+            d.info+=result.sendok===1?'\n成功':'\n失败';
           }
         }
         
@@ -748,7 +754,7 @@ export default {
             }
           }
           if(o.state === 'wait' || o.state === 'run'){
-            if(Util.isExpired(o.startMillis,millis,o.numexp*1000)){
+            if(Util.isExpired(o.startMillis,millis,o.verexp*1000)){
               continue;
             }
           }
