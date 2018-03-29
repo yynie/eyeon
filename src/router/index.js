@@ -1,17 +1,18 @@
 import Vue from 'vue'
 import Router from 'vue-router'
 import iView from 'iview'
-import {homeRouter,signinRouter} from './routers'
+import {homeRouter,signinRouter,page404} from './routers'
 import Util from '../common/Util'
 import Cookies from '../common/Cookies'
 
 Vue.use(Router)
 
 export const router = new Router({
-//  mode: 'history', //这样就url就不会显示#
+  mode: 'history', //这样就url就不会显示#
   routes: [
     homeRouter,
     signinRouter,
+    page404
   ]
 });
 
