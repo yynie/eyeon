@@ -1,6 +1,6 @@
 import ERROR404 from '@/components/error-404';
 export const signinRouter = {
-    path: '/vaddwebsock/login',
+    path: '/login',
     name: 'SignIn',
     meta: {
         title: '登录'
@@ -9,7 +9,7 @@ export const signinRouter = {
 };
 
 export const homeRouter = {
-    path: '/vaddwebsock',
+    path: '/',
     name: 'Home',
     meta: {
         title: ''

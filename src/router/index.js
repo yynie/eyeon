@@ -8,7 +8,8 @@ import Cookies from '../common/Cookies'
 Vue.use(Router)
 
 export const router = new Router({
-  mode: 'history', //这样就url就不会显示#
+  base: 'vaddwebsock',
+  //mode: 'history', //这样就url就不会显示#
   routes: [
     homeRouter,
     signinRouter,
