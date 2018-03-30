@@ -38,6 +38,10 @@
           </Form>
         </div>
       </Card>
+      <div class="sign-in-footer" style="width:500px;marginBottom:30px;text-align:center">
+        <p>推荐使用 Google Chrome 或 IE10 以上的浏览器, 低版本浏览器可能功能不全</p>
+        <p>不提供注册，开户和密码变更请联系后台</p>
+      </div>
     </div>
   </div>
 </template>
@@ -147,10 +151,7 @@ export default {
     border-top-right-radius: 6px;
     border: 1px solid fade(#444,10%);
   }
-  Input{
-   
-    
-  }
+
 }
 </style>
 
