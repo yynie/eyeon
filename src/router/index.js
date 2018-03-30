@@ -8,8 +8,8 @@ import Cookies from '../common/Cookies'
 Vue.use(Router)
 
 export const router = new Router({
-  base: 'vaddwebsock',
-  //mode: 'history', //这样就url就不会显示#
+  base: '/vcpweb/',  //生产环境部署后 访问路径是 http://xxx.xxx:port/vcpweb, 同时修改config/index.js 的 assetsPublicPath: 'vcpweb' 
+  mode: 'history', //这样就url就不会显示#
   routes: [
     homeRouter,
     signinRouter,
