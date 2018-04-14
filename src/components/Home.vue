@@ -47,10 +47,14 @@
             <p style="line-height:90px">未选择项目</p>
           </div>
           <div :class="(curSub.onoff===1)?'opsub-div-blue':'opsub-div-gray'" v-else>
-            <p>项目：<span style="color:#ff7700;marginRight:6px">{{curSub.name}}</span> SUBID：<span style="color:#ff7700">{{curSub.subid}}</span></p>
+            <p>
+              项目：<span style="color:#ff7700;marginRight:6px">{{curSub.name}}</span> 
+              SUBID：<span style="color:#ff7700">{{curSub.subid}}</span>
+            </p>
             <p style="marginTop:10px">单价：{{curSub.price}}</p>
             <Row style="height:40px">
-              <p style="float:left;line-height:40px">授权：{{(curSub.onoff===1)?'已授权':'未授权'}}</p>
+              <p v-if="/^02/.test(this.curSub.subid) === true" style="float:left;line-height:40px">!网页版不支持&lt;02型&gt;任务</p>
+              <p v-else style="float:left;line-height:40px">授权：{{(curSub.onoff===1)?'已授权':'未授权'}}</p>
               <Button :disabled="disPubButton" :loading="publishing" style="float:right;height:36px" type='primary' @click="pubTask">
               发布
               </Button>
@@ -133,18 +137,18 @@
       <Col :md="16" :sm="16" :xs="16" :lg="18">
         <Row>
           <Col :span="12">
-            <worker-card style="marginRight:4px" v-model="workers[0]" @close="workerClose"/>
+            <worker-card style="marginRight:4px" v-model="workers[0]" @close="workerClose" @send-config="rtConfigSet"/>
           </Col>
           <Col :span="12">
-            <worker-card style="marginRight:4px" v-model="workers[1]" @close="workerClose"/>
+            <worker-card style="marginRight:4px" v-model="workers[1]" @close="workerClose" @send-config="rtConfigSet"/>
           </Col>
         </Row>
         <Row>
           <Col :span="12">
-            <worker-card style="marginRight:4px;marginTop:4px" v-model="workers[2]" @close="workerClose"/>
+            <worker-card style="marginRight:4px;marginTop:4px" v-model="workers[2]" @close="workerClose" @send-config="rtConfigSet"/>
           </Col>
           <Col :span="12">
-            <worker-card style="marginRight:4px;marginTop:4px" v-model="workers[3]" @close="workerClose"/>
+            <worker-card style="marginRight:4px;marginTop:4px" v-model="workers[3]" @close="workerClose" @send-config="rtConfigSet"/>
           </Col>
         </Row>
       </Col>
@@ -200,10 +204,10 @@ export default {
  * 关闭网页：game over
  */
       workers:[
-        {index:0,state:'off',reqid:null,startMillis:0,numexp:0,verexp:0,phone:null,minfo:null,data:null},
-        {index:1,state:'off',reqid:null,startMillis:0,numexp:0,verexp:0,phone:null,minfo:null,data:null},
-        {index:2,state:'off',reqid:null,startMillis:0,numexp:0,verexp:0,phone:null,minfo:null,data:null},
-        {index:3,state:'off',reqid:null,startMillis:0,numexp:0,verexp:0,phone:null,minfo:null,data:null}
+        {index:0,state:'off',reqid:null,startMillis:0,numexp:0,verexp:0,taskid:null,phone:null,minfo:null,data:null},
+        {index:1,state:'off',reqid:null,startMillis:0,numexp:0,verexp:0,taskid:null,phone:null,minfo:null,data:null},
+        {index:2,state:'off',reqid:null,startMillis:0,numexp:0,verexp:0,taskid:null,phone:null,minfo:null,data:null},
+        {index:3,state:'off',reqid:null,startMillis:0,numexp:0,verexp:0,taskid:null,phone:null,minfo:null,data:null}
       ],
       workersQueue:[],
       workerStatus:{
@@ -289,6 +293,8 @@ export default {
       if(this.account.boundkey === null || this.connectstatus !== 3){//没有绑key 没建立ws
         return true;
       }else if(this.curSub.onoff===0){//项目没开
+        return true;
+      }else if(/^02/.test(this.curSub.subid)=== true){ //02开头的实时配置型任务 在web端不能做
         return true;
       }else if(this.workerStatus.workersNum >= 4){//工蜂已用完
         return true;
@@ -427,6 +433,21 @@ export default {
         okText:"关闭"
       });
     },
+    rtConfigSet:function(conf){
+      console.log("rtConfigSet "+JSON.stringify(conf));
+      this.wsSend(JSON.stringify(conf));
+      // this.$http.jsonp('http://api.douban.com/v2/movie/in_theaters',{},{
+      //   headers: {
+
+      //           },
+      //   emulateJSON: true
+      // }).then((response) => {
+      //     console.log("1:");
+      //     this.wsSend(JSON.stringify(conf));
+      // },(response) => {
+      //     console.log(response);
+      // });
+    },
     deletePrefixs:function(index){
       this.task.prefixs.splice(index, 1);
     },
@@ -522,7 +543,7 @@ export default {
     },
     wsMessage:function(e){
       var data = JSON.parse(e.data);
-      //console.log(JSON.stringify(data));
+     // console.log(JSON.stringify(data));
       if(data.state === '200000'){
         if(('result' in data) && ('wsid' in data.result)){
           this.wsid = data.result.wsid;
@@ -585,10 +606,11 @@ export default {
       if(parseddata.type === 'phone'){//返号
         var myDate = new Date();
         var millis = myDate.getTime();
-        console.log("startMillis:"+millis)
+        //console.log("startMillis:"+millis)
         for(var i=0;i<4;i++){
           if(this.workers[i].reqid === requestid && this.workers[i].state === 'on'){
             this.workers[i].startMillis = millis;
+            this.workers[i].taskid = parseddata.taskid;
             this.workers[i].phone = parseddata.phonenum;
             this.workers[i].minfo = parseddata.minfo;
             this.workers[i].data=[parseddata.data];
@@ -628,18 +650,44 @@ export default {
         phonenum:result.phonenum,
         type:'unknown'
       }
+      if('taskid' in result){
+        ret['taskid'] = result.taskid;
+      }
       var timestr = moment().format('HH:mm:ss') + ' '+ moment().millisecond();
       
       if('minfo' in result){
         ret.type = 'phone';
         ret['minfo'] = result.minfo;
         ret.minfo['gettime'] = timestr;
+        var needconfig=false;
+        if('config' in result){
+          needconfig = result.config;
+        }
         var d = {
           vicon:'trophy',
           phrase:null,
-          info:result.phonenum + " 已接",
+          info:result.phonenum + ((needconfig === true)?" 已接, 等待配置数据":" 已接"),
+          needconfig:needconfig,
           time:timestr
         }
+        ret['data']=d;
+      }else if('configok' in result){
+        ret.type = 'data';
+        var d = {
+          vicon:'ios-circle-outline',
+          phrase:null,
+          info:(result.configok === true)?"配置成功":"配置失败，手机"+result.phonenum+"的任务作废",
+          time:timestr
+        };
+        ret['data']=d;
+      }else if('configgot' in result){
+        ret.type = 'data';
+        var d = {
+          vicon:'ios-circle-outline',
+          phrase:null,
+          info:(result.configgot === true)?"手机"+result.phonenum+"已取走配置":"这个不可能出现吧",
+          time:timestr
+        };
         ret['data']=d;
       }else if(('verifycode' in result) || ('verifysms' in result) || ('sendsms' in result)){
         ret.type = 'data';
@@ -783,7 +831,7 @@ export default {
       if(this.websocket !== null){
         this.websocket.close();
       }
-    }
+    },
   },
   mounted(){
     var get = Cookies.get('8EEFF760CE134927BFD3CCDAC2ADFF32');

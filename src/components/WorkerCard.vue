@@ -32,6 +32,19 @@
               </p>
               -->
               <div class="multilinediv" v-html="formateInfo(item.phrase,item.info)"></div>
+              <div v-show="item.needconfig" class="configdiv">
+                <Input v-model="conf.smscontent">
+                  <span slot="prepend">发送短信</span>
+                </Input>
+                <Input v-model="conf.sendto" style="marginTop:10px" @on-keyup="conf.sendto=conf.sendto.replace(/[^0-9]/g,'')">
+                  <span slot="prepend">发送到</span>
+                  <Button slot="append" style="background:#2d8cf0;color:#fff" :disabled="!validConfig"
+                  @click="sendConfig(item)">确定</Button>
+                </Input>
+              </div>
+              <div v-show="item.configsent" class="configdivsent">
+                配置已发送
+              </div>
           </TimelineItem>
       </Timeline>
       </div>
@@ -62,7 +75,8 @@ export default {
   },
   data(){
     return {
-      exp:0
+      exp:0,
+      conf:{smscontent:"",sendto:""}
     }
   },
   computed:{
@@ -126,6 +140,9 @@ export default {
     currentdata(){
       return this.value.data;
     },
+    validConfig(){
+      return (this.conf.smscontent.length > 0 && this.conf.sendto.length > 0);
+    }
   },
   methods:{
     formateInfo:function(phrase ,info){
@@ -175,6 +192,17 @@ export default {
       }
       
       return ret;
+    },
+    sendConfig(item){
+      var data = {
+        taskid:this.value.taskid,
+        phonenum:this.value.phone,
+        config:this.conf
+      }
+      console.log("sendConfig data:"+JSON.stringify(data))
+      this.$emit("send-config",data);
+      item.needconfig = false;
+      item['configsent'] = true;
     }
   },
   watch:{
@@ -251,6 +279,16 @@ export default {
   // word-wrap:break-word;
   font-size:10pt;
   margin-top:4px;
+}
+.configdiv{
+  background: fade(#c4dafc, 50%);
+  margin: 2px 38px 2px 18px;
+  padding: 10px 40px;
+}
+.configdivsent{
+  background: fade(#cacbcc, 50%);
+  margin: 2px 38px 2px 18px;
+  text-align: center
 }
 </style>
 
