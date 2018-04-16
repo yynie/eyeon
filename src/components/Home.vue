@@ -685,7 +685,7 @@ export default {
         var d = {
           vicon:'ios-circle-outline',
           phrase:null,
-          info:(result.configgot === true)?"手机"+result.phonenum+"已取走配置":"这个不可能出现吧",
+          info:(result.configgot === true)?"手机 "+result.phonenum+" 已取走配置":"这个不可能出现吧",
           time:timestr
         };
         ret['data']=d;
