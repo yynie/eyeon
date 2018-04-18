@@ -38,8 +38,12 @@
                 </Input>
                 <Input v-model="conf.sendto" style="marginTop:10px" @on-keyup="conf.sendto=conf.sendto.replace(/[^0-9]/g,'')">
                   <span slot="prepend">发送到</span>
-                  <Button slot="append" style="background:#2d8cf0;color:#fff" :disabled="!validConfig"
+                  <p slot="append">
+                  <Button style="background:#ff8080;color:#fff;marginRight:4px"
+                  @click="cancelConfig(item)">放弃</Button>
+                  <Button style="background:#2d8cf0;color:#fff" :disabled="!validConfig"
                   @click="sendConfig(item)">确定</Button>
+                  </p>
                 </Input>
               </div>
               <div v-show="item.configsent" class="configdivsent">
@@ -167,6 +171,7 @@ export default {
     close:function(event){
       if(this.value.state !== 'off'){
       this.$emit('close',this.value.index);
+      this.exp = 0;
       }
     },
     timeOut:function(){
@@ -174,13 +179,14 @@ export default {
     },
     adjustExp:function(){
       var ret = 0;
-      if(this.value.state === 'on'){
+      if(this.value.state === 'on' || this.value.state === 'tobeconfig'){
         ret = this.value.numexp;
       }else if(this.value.state === 'wait' || this.value.state === 'run'){
         ret = this.value.verexp;
       }else{
         return ret;
       }
+      console.log("adjustExp numexp:"+this.value.numexp+",verexp:"+this.value.verexp)
       var myDate = new Date();
       var millis = myDate.getTime();
       console.log("adjustExp current:"+millis)
@@ -203,12 +209,25 @@ export default {
       this.$emit("send-config",data);
       item.needconfig = false;
       item['configsent'] = true;
+    },
+    cancelConfig(item){
+      var data = {
+        taskid:this.value.taskid,
+        phonenum:this.value.phone,
+        config:{cancel:true}
+      }
+      console.log("sendConfig data:"+JSON.stringify(data))
+      this.$emit("send-config",data);
+      item.needconfig = false;
+      item['configsent'] = true;
     }
   },
   watch:{
     currentstate(newValue,oldValue){
       console.log("worker current state watch:"+oldValue+"=>"+newValue);
-      if(newValue === 'wait'){
+      if(newValue === 'failed'){
+      //  this.exp = 0;
+      }else if(newValue === 'wait'){
         this.exp = 0;
         this.exp = this.adjustExp();
       }else if(newValue === 'on'){

@@ -53,7 +53,7 @@
             </p>
             <p style="marginTop:10px">单价：{{curSub.price}}</p>
             <Row style="height:40px">
-              <p v-if="/^02/.test(this.curSub.subid) === true" style="float:left;line-height:40px">!网页版不支持&lt;02型&gt;任务</p>
+              <p v-if="/^02/.test(this.curSub.type) === true" style="color:#f00;float:left;line-height:40px">! 网页版不支持&lt;02型&gt;任务</p>
               <p v-else style="float:left;line-height:40px">授权：{{(curSub.onoff===1)?'已授权':'未授权'}}</p>
               <Button :disabled="disPubButton" :loading="publishing" style="float:right;height:36px" type='primary' @click="pubTask">
               发布
@@ -294,7 +294,7 @@ export default {
         return true;
       }else if(this.curSub.onoff===0){//项目没开
         return true;
-      }else if(/^02/.test(this.curSub.subid)=== true){ //02开头的实时配置型任务 在web端不能做
+      }else if(/^02/.test(this.curSub.type)=== true){ //02开头的实时配置型任务 在web端不能做
         return true;
       }else if(this.workerStatus.workersNum >= 4){//工蜂已用完
         return true;
@@ -334,6 +334,7 @@ export default {
          var index = parseInt(this.selectedSubid);
          this.curSub = {
            name:this.subjects[index].subname,
+           type:this.subjects[index].subtype,
            subid:this.subjects[index].subid,
            price:this.subjects[index].price,
            onoff:this.subjects[index].onoff,
@@ -366,6 +367,7 @@ export default {
                   id:index.toString(),
                   subid:sub.subid,
                   subname:sub.subname,
+                  subtype:sub.subtype,
                   price:sub.price,
                   onoff:sub.onoff
                 };
@@ -609,12 +611,17 @@ export default {
         //console.log("startMillis:"+millis)
         for(var i=0;i<4;i++){
           if(this.workers[i].reqid === requestid && this.workers[i].state === 'on'){
-            this.workers[i].startMillis = millis;
             this.workers[i].taskid = parseddata.taskid;
             this.workers[i].phone = parseddata.phonenum;
             this.workers[i].minfo = parseddata.minfo;
             this.workers[i].data=[parseddata.data];
-            this.workers[i].state = 'wait';
+            if(parseddata.data.needconfig === true){
+              this.workers[i].state = 'tobeconfig';
+            }else{
+              this.workers[i].startMillis = millis;
+              this.workers[i].state = 'wait';
+            }
+            
             break;
           }
         }
@@ -627,9 +634,26 @@ export default {
         var millis = myDate.getTime();
         for(var i=0;i<4;i++){
           if(this.workers[i].reqid === requestid && this.workers[i].phone === parseddata.phonenum){
+            if(this.workers[i].state === 'tobeconfig'){
+              //console.log("tobeconfig "+ JSON.stringify(parseddata))
+              if('configok' in parseddata.data){
+               // console.log("tobeconfig  configok="+parseddata.data.configok);
+                if(parseddata.data.configok === false){
+                 // this.workers[i].state === 'failed';
+                }
+              }
+              if('configgot' in parseddata.data){
+                if(parseddata.data.configgot === true){
+                  this.workers[i].startMillis = millis;
+                  this.workers[i].state = 'wait';
+                }
+              }
+              this.workers[i].data.push(parseddata.data); 
+              break;             
+            }
             if(this.workers[i].state === 'wait'){
               this.workers[i].data.push(parseddata.data);
-              this.workers[i].state === 'run';
+              this.workers[i].state = 'run';
               break;
             }
             if(this.workers[i].state === 'run'){
@@ -677,6 +701,7 @@ export default {
           vicon:'ios-circle-outline',
           phrase:null,
           info:(result.configok === true)?"配置成功":"配置失败，手机"+result.phonenum+"的任务作废",
+          configok:result.configok,
           time:timestr
         };
         ret['data']=d;
@@ -686,6 +711,7 @@ export default {
           vicon:'ios-circle-outline',
           phrase:null,
           info:(result.configgot === true)?"手机 "+result.phonenum+" 已取走配置":"这个不可能出现吧",
+          configgot:result.configgot,
           time:timestr
         };
         ret['data']=d;
@@ -781,6 +807,7 @@ export default {
         this.workers[index].numexp = 0;
         this.workers[index].verexp = 0;
         this.workers[index].phone = null;
+        this.workers[index].taskid = null;
         this.workers[index].minfo = null;
         this.workers[index].data = null;
         this.workerStatus.workersNum--;
@@ -813,6 +840,9 @@ export default {
           this.workers[i].verexp = o.verexp;
           if('phone' in o){
             this.workers[i].phone = o.phone;
+          }
+          if('taskid' in o){
+            this.workers[i].taskid = o.taskid;
           }
           if('minfo' in o){
             this.workers[i].minfo = o.minfo;

@@ -1,5 +1,3 @@
-import { duration } from "_moment@2.21.0@moment";
-
 let util = {
 
 };
