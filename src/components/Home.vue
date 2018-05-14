@@ -12,12 +12,19 @@
             <DropdownMenu slot="list">
                 <DropdownItem disabled><span style="color:#2d8cf0">{{vcpdisp}}</span></DropdownItem>
                 <DropdownItem :disabled="account.boundkey === null" name="balance"><b>￥账户余额</b></DropdownItem>
+                <DropdownItem :disabled="account.boundkey === null" name="histroy"><b>历史记录</b></DropdownItem>
                 <DropdownItem :disabled="account.accname === null" name="charge"><b>￥充值</b></DropdownItem>
                 <DropdownItem name="exit"><b>注销<Icon type="log-out" style="marginLeft:6px"/></b></DropdownItem>
             </DropdownMenu>
           </Dropdown>
+          <Modal ref="historyModalIns" :styles="{top: '16px'}" v-model="showHistory" :mask-closable="false" :footerHide="true" :width="histroyModalWidth" :closable="false">
+            <history-modal ref="historyInstance" :apikey="account.boundkey" :subjects="subjects" :cursub="curSub" @on-closed="historyClose" />
+            <!-- 动态component无法找到内部method，因此弃用
+            <component :is="currentModalView" ref="historyInstance" :apikey="account.boundkey" :subject="curSub" @on-closed="historyClose"></component>
+            -->
+          </Modal>
           <Tag v-if="showBoundInfo" style="marginLeft:40px;width:340px" type="dot" color="red">{{boundinfo}}</Tag>
-          <Select v-else v-model="selectedSubid" clearable filterable style="marginLeft:40px;width:340px" @on-change="subjectChange">
+          <Select v-else v-model="selectedSubid" clearable filterable style="marginLeft:40px;width:340px" placeholder="请选择项目" @on-change="subjectChange">
             <Option v-for="item in subjects" :value="item.id" :key="item.id">
               <span>{{item.subname}}</span>
               <span style="marginLeft:8px;color:#ff5500">{{item.subid}}</span>
@@ -162,12 +169,15 @@ import Util from '../common/Util'
 import moment from 'moment';
 import '../common/md5';
 import WorkerCard from './WorkerCard.vue'
+import HistoryModal from './HistoryModal.vue'
 //import VCheckGroup from '../views/VCheckGroup.vue';
 export default {
   name: 'Home',
   components: {
     //VCheckGroup,
-    WorkerCard
+    WorkerCard,
+    HistoryModal,
+    NotShow:{template: '<p>This modal is not shown now!</p>'}
   },
   data () {
     return {
@@ -192,7 +202,6 @@ export default {
       provinceList:['北京','天津','河北','山西','内蒙古','辽宁','吉林','黑龙江','上海','江苏','浙江','安徽','福建','江西','山东','河南','湖北',
       '湖南','广东','广西','海南','重庆','四川','贵州','云南','西藏','陕西','甘肃','青海','宁夏','新疆','台湾','香港','澳门'],
       operatorList:['移动','联通'],
-
 /**
  * 4只workerbees记录运行中的任务数据，各项含义：
  * index 工蜂代号，state 状态，reqid requestid，startMillis 每个超时的起始计时点，numexp 取号超时，verexp 码超时，phone 终端号码，minfo 归属地运营商，data 终端回传的数据
@@ -213,7 +222,11 @@ export default {
       workerStatus:{
         pubreq:null,
         workersNum:0,
-      }
+      },
+
+      showHistory:false,
+      histroyModalWidth:1330,
+     // currentModalView:"not-show",
     }
   },
   computed:{
@@ -318,7 +331,14 @@ export default {
         this.showBalanceModal();
       }else if(menu === 'charge'){
         this.showQRCode();
+      }else if(menu === 'histroy'){
+        //this.currentModalView="history-modal";
+        this.showHistory = true;
       }
+    },
+    historyClose:function(){
+      this.$refs.historyModalIns.close();
+      //currentModalView:"not-show"; 
     },
     handleSignOut:function(){
       Cookies.delete('8EEFF760CE134927BFD3CCDAC2ADFF32');
@@ -862,6 +882,11 @@ export default {
         this.websocket.close();
       }
     },
+    clientResize:function(){
+      this.histroyModalWidth = Math.min(1330, Math.max((document.body.clientWidth-16),1020));
+      //console.log("this.histroyModalWidth="+this.histroyModalWidth);
+      this.$refs.historyInstance.clientResized();
+    }
   },
   mounted(){
     var get = Cookies.get('8EEFF760CE134927BFD3CCDAC2ADFF32');
@@ -869,7 +894,9 @@ export default {
     this.account.user = user.user;
    // console.log("mounted"+JSON.stringify(this.account));
     this.loadVcpData();
+    this.clientResize();
     window.onbeforeunload = this.onbeforeunload;
+    window.onresize = this.clientResize;
     this.$Message.config({
       top: 200,
     });
