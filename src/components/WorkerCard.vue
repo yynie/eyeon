@@ -21,7 +21,7 @@
           <Icon style="margin:4px" type="close-round"></Icon>
         </div>
       </Row>
-      <div ref="resdiv" :class="resultClass">
+      <div ref="resdiv" :class="resultClass" :style="resDivHeight">
         <Timeline>
           <TimelineItem color="green" v-for="(item,index) in value.data" :key="index">
               <Icon :type="item.vicon" slot="dot"></Icon>
@@ -80,10 +80,14 @@ export default {
   data(){
     return {
       exp:0,
-      conf:{smscontent:"",sendto:""}
+      conf:{smscontent:"",sendto:""},
+      divh:320
     }
   },
   computed:{
+    resDivHeight(){
+      return "height:"+this.divh+"px";
+    },
     isworking(){
       return (this.value.state !== 'off');
     },
@@ -220,6 +224,15 @@ export default {
       this.$emit("send-config",data);
       item.needconfig = false;
       item['configsent'] = true;
+    },
+    calcDivHeight:function(){
+      var h = document.body.clientHeight;
+     // console.log("calcDivHeight:h="+h);
+      this.divh = (h-235)/2;
+     // console.log("calcDivHeight:divh="+this.divh);
+    },
+    clientResized:function(){
+      this.calcDivHeight();
     }
   },
   watch:{
@@ -283,12 +296,12 @@ export default {
   }
 }
 .result-div-active{
-  height: 320px;
+  //height: 320px;
   background: #fff;
   overflow: auto;
 }
 .result-div-sleep{
-  height: 320px;
+  //height: 320px;
   background: #ddd;
   overflow: auto;
 }

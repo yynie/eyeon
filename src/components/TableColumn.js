@@ -14,21 +14,40 @@ export const historyColumns = () => {
     {
       key: 'status',
       title: '状态',
-      width: 114,
+      width: 116,
       render: (h, params) => {
         var color = ''
-        var text = ''+ params.row.status;
+        var text = '';
+        var S_RECVD = 0x0002;
+        var S_RECVD2VCP = 0x0004;
+        var S_SENT = 0x0008;
+        var S_CONCLUDED = 0x0010;
+        var S_FEE = 0x0040;
+        var S_RECVD_TIMEOUT = 0x0080;
         if(params.row.status===0){
-          text = '未返号';
+          text = '未取号';
         }else if(params.row.status===1){
           color = '#ff7700';
-          text = '已返号';
-        }else if(params.row.status===3){     
+          text = '取号';
+        }else if((S_RECVD === (params.row.status & S_RECVD)) && (S_RECVD2VCP !== (params.row.status & S_RECVD2VCP))){
           text = '返码时断线';
-        }else if(params.row.status===103 || params.row.status===119){
-          color = 'green';
-          text = '已返码';
-        }
+        }else if(S_RECVD_TIMEOUT === (params.row.status & S_RECVD_TIMEOUT)){
+          text = '返码超时';
+        }else{
+          if(S_SENT === (params.row.status & S_SENT)){
+            text = '发信成功'
+          }
+          if(S_RECVD2VCP === (params.row.status & S_RECVD2VCP)){
+            // if(text !== ''){
+            //   text+='|';
+            // }
+            text = '已返码';
+          }
+          if(S_FEE === (params.row.status & S_FEE)){
+            color = 'green';
+            text += ' ￥'
+          }
+        } 
 
         return h('span', {
                 style: {

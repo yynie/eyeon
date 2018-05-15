@@ -2,35 +2,35 @@
 <div>
   <Row>
     <div style="float:left">
-      <Select v-model="selectedSubid" filterable style="width:140px;marginRight:10px" placeholder="请选择项目">
+      <Select v-model="selectedSubid" filterable style="width:140px;marginRight:10px" placeholder="请选择项目" :disabled="tabledata.loading">
         <Option v-for="item in subjects" :value="item.subid" :key="item.subid">{{item.subname}}</Option>
       </Select>
     </div>
     <div style="float:left">
       <RadioGroup v-model="type" type="button">
-        <Radio label="每7天查询"></Radio>
-        <Radio label="按自然周查询"></Radio>
-        <Radio label="自定义日期"></Radio>
+        <Radio label="每7天查询" :disabled="tabledata.loading"></Radio>
+        <Radio label="按自然周查询" :disabled="tabledata.loading"></Radio>
+        <Radio label="自定义日期" :disabled="tabledata.loading"></Radio>
       </RadioGroup>
     </div>
     <div class="fitlerbar" style="float:left">
       <span  v-show="type==='每7天查询'">
-        <Button @click="prev7days" :disabled="!can7DaysPrev"><Icon style="marginRight:4px" size="14" type="ios-arrow-left"></Icon>向前7天</Button>
+        <Button @click="prev7days" :disabled="!can7DaysPrev || tabledata.loading"><Icon style="marginRight:4px" size="14" type="ios-arrow-left"></Icon>向前7天</Button>
         <Tag type="border" color="blue">{{current7Days}}</Tag>
-        <Button @click="next7days" :disabled="!can7DaysNext">向后7天<Icon type="ios-arrow-right" style="marginLeft:4px" size="14"></Icon></Button>
+        <Button @click="next7days" :disabled="!can7DaysNext || tabledata.loading">向后7天<Icon type="ios-arrow-right" style="marginLeft:4px" size="14"></Icon></Button>
       </span>
       <span  v-show="type==='按自然周查询'">
-        <Button @click="prevWeekdays" :disabled="!canWeekPrev"><Icon style="marginRight:4px" size="14" type="ios-arrow-left"></Icon>前一周</Button>
+        <Button @click="prevWeekdays" :disabled="!canWeekPrev || tabledata.loading"><Icon style="marginRight:4px" size="14" type="ios-arrow-left"></Icon>前一周</Button>
         <Tag type="border" color="blue">{{currentWeekDays}}</Tag>
-        <Button @click="nextWeekdays" :disabled="!canWeekNext">后一周<Icon type="ios-arrow-right" style="marginLeft:4px" size="14"></Icon></Button>
+        <Button @click="nextWeekdays" :disabled="!canWeekNext || tabledata.loading">后一周<Icon type="ios-arrow-right" style="marginLeft:4px" size="14"></Icon></Button>
       </span>
       <span  v-show="type==='自定义日期'">
         <DatePicker type="daterange" placeholder="选择日期" style="width: 300px" :start-date="customStartDate" :options="optionsOfDate"
-        @on-change="setCustDate"></DatePicker>
+        @on-change="setCustDate" :disabled="tabledata.loading"></DatePicker>
       </span>
     </div>
     <div style="float:left">
-      <Button type="primary">查询</Button>
+      <Button type="primary" @click="refresh" :disabled="tabledata.loading">查询/刷新</Button>
     </div>
     <div class="step-close-con" @click="close">
       <Icon type="ios-close-empty" size='30' color='#999'></Icon>
@@ -39,7 +39,7 @@
   <Row style="marginTop:20px">
     <Table ref="mytable" :loading="tabledata.loading" border stripe highlight-row :columns="columns" :data="tabledata.items" :height='tableHeight'></Table>
     <div style="text-align:center">
-      <Page v-show="!tabledata.loading" show-total size="small" :page-size="tabledata.pagesize" :total="tabledata.total" :current="tabledata.page"
+      <Page show-total size="small" :page-size="tabledata.pagesize" :total="tabledata.total" :current="tabledata.page"
        @on-change="changePage" :style="{lineHeight:'30px'}"></Page> 
     </div>
   </Row>
@@ -100,17 +100,7 @@ export default {
       selectedSubid:"",
       tabledata:{
         loading:false,
-        items:[
-          {
-            phonenum:"18917644349",
-            createtime:'2018-05-12 12:45:07',
-            updatetime:'2018-05-12 12:45:14',
-            verifysms:'尊敬的用户：验证码529946，仅用于注册咪咕帐号，有效时间5分钟。如非本人操作，请忽略此短信。回复qx退订【中国移动　咪咕认证平台】',
-            verifycode:'12345689',
-            status:3
-          },
-          
-        ],
+        items:[],
         pagesize: 30,
         page:1,
         total:0,
@@ -121,6 +111,16 @@ export default {
     currentSub(){
       return this.cursub;
     },
+    allOptions() {
+      const { selectedSubid, type,  days7, week, cust} = this;
+      return {
+        selectedSubid,
+        type,
+        days7,
+        week,
+        cust
+      }
+    },
     columns(){
       return historyColumns();
     },
@@ -128,7 +128,7 @@ export default {
       if(this.week.startfrom === null){
         var today = moment();
         var weekOfday = today.format('E');//计算今天是这周第几天  
-        console.log("currentWeekDays weekOfday="+weekOfday)
+        //console.log("currentWeekDays weekOfday="+weekOfday)
         this.week.startfrom = today.subtract(weekOfday-1, 'days').format('YYYY-MM-DD');//周一
         this.week.endto = today.subtract(-6, 'days').format('YYYY-MM-DD');//周日
       }
@@ -190,6 +190,26 @@ export default {
       var early = moment().subtract(29, 'days'); //最早为当前日期向前30天(包括当前日期)
       //console.log(early.toDate())
       return early.toDate();
+    },
+    calcStartFrom(){
+      if(this.type==='每7天查询'){
+        return this.days7.startfrom;
+      }else if(this.type==='按自然周查询'){
+        return this.week.startfrom;
+      }else if(this.type==='自定义日期'){
+        return this.cust.startfrom;
+      }
+      return null;
+    },
+    calcEndTo(){
+      if(this.type==='每7天查询'){
+        return this.days7.endto;
+      }else if(this.type==='按自然周查询'){
+        return this.week.endto;
+      }else if(this.type==='自定义日期'){
+        return this.cust.endto;
+      }
+      return null;
     }
   },
   methods:{
@@ -246,6 +266,10 @@ export default {
     },
     close:function(){
       //this.$refs.mytable.$destroy();
+      if(this.tabledata.loading === true){
+        this.$Message.info("正在读取网络数据，请稍后...");
+        return;
+      }
       this.$emit("on-closed");
     },
     calcTableHeight:function(){
@@ -258,7 +282,56 @@ export default {
       this.calcTableHeight();
     },
     changePage:function(curpage){
-
+      this.tabledata.page = curpage;
+      this.search();
+    },
+    refresh:function(){
+      this.tabledata.page = 1;
+      this.search();
+    },
+    search:function(){
+      var query = {
+        apikey:"72786A1CF2C8CB09BDEA3953D3E2C57C",//"72786A1CF2C8CB09BDEA3953D3E2C57C",//this.apikey,
+        subid:this.selectedSubid,
+        page:this.tabledata.page,
+        pagesize:this.tabledata.pagesize,
+        startfrom:this.calcStartFrom,
+        endto:this.calcEndTo
+      };
+      //console.log("query="+JSON.stringify(query));
+      if(query.startfrom === null || query.startfrom === undefined || query.startfrom.trim().length === 0
+        || query.endto === null || query.endto === undefined || query.endto.trim().length === 0){
+          this.$Message.error("请选择日期");
+          return;
+      }
+      this.tabledata.items.splice(0,this.tabledata.items.length);
+      this.tabledata.loading = true;
+      this.$http.get(URL_HISTORY,{params:query}).then((response) => {
+        //console.log("response="+JSON.stringify(response));
+        var result = response.body;
+        if(result.err !== null && result.err !== undefined){
+          this.$Message.error(result.err);
+        }else{
+          this.tabledata.total = result.total;
+          
+          result.items.forEach(it=>{
+            var one = {
+              phonenum:it.phonenum,
+              verifysms:it.verifysms,
+              verifycode:it.verifycode,
+              status:it.status,
+              createtime:moment(it.createtime).format('YYYY-MM-DD HH:mm:ss'),
+              updatetime:moment(it.updatetime).format('YYYY-MM-DD HH:mm:ss'),
+            }
+            this.tabledata.items.push(one);
+          })
+        }
+        this.tabledata.loading = false;
+      },(response)=>{
+        console.log("err:response="+JSON.stringify(response));
+        this.$Message.error("网络错误!");
+        this.tabledata.loading = false;
+      });
     }
   },
   watch:{
@@ -273,7 +346,16 @@ export default {
         }    
       },
       deep:true
-    }
+    },
+    allOptions:{
+      handler(newValue, oldValue){
+       // console.log("options change");
+        this.tabledata.items.splice(0,this.tabledata.items.length);
+        this.tabledata.page=1;
+        this.tabledata.total=0;
+      },
+      deep:true
+    },
   }
   // mounted(){
   //   console.log("history modal mounted");

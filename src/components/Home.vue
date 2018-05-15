@@ -144,18 +144,18 @@
       <Col :md="16" :sm="16" :xs="16" :lg="18">
         <Row>
           <Col :span="12">
-            <worker-card style="marginRight:4px" v-model="workers[0]" @close="workerClose" @send-config="rtConfigSet"/>
+            <worker-card ref="worker0" style="marginRight:4px" v-model="workers[0]" @close="workerClose" @send-config="rtConfigSet"/>
           </Col>
           <Col :span="12">
-            <worker-card style="marginRight:4px" v-model="workers[1]" @close="workerClose" @send-config="rtConfigSet"/>
+            <worker-card ref="worker1" style="marginRight:4px" v-model="workers[1]" @close="workerClose" @send-config="rtConfigSet"/>
           </Col>
         </Row>
         <Row>
           <Col :span="12">
-            <worker-card style="marginRight:4px;marginTop:4px" v-model="workers[2]" @close="workerClose" @send-config="rtConfigSet"/>
+            <worker-card ref="worker2" style="marginRight:4px;marginTop:4px" v-model="workers[2]" @close="workerClose" @send-config="rtConfigSet"/>
           </Col>
           <Col :span="12">
-            <worker-card style="marginRight:4px;marginTop:4px" v-model="workers[3]" @close="workerClose" @send-config="rtConfigSet"/>
+            <worker-card ref="worker3" style="marginRight:4px;marginTop:4px" v-model="workers[3]" @close="workerClose" @send-config="rtConfigSet"/>
           </Col>
         </Row>
       </Col>
@@ -883,9 +883,13 @@ export default {
       }
     },
     clientResize:function(){
-      this.histroyModalWidth = Math.min(1330, Math.max((document.body.clientWidth-16),1020));
+      this.histroyModalWidth = Math.min(1330, Math.max((document.body.clientWidth-16),1050));
       //console.log("this.histroyModalWidth="+this.histroyModalWidth);
       this.$refs.historyInstance.clientResized();
+      this.$refs.worker0.clientResized();
+      this.$refs.worker1.clientResized();
+      this.$refs.worker2.clientResized();
+      this.$refs.worker3.clientResized();
     }
   },
   mounted(){
